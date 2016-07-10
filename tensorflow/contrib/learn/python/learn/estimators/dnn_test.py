@@ -42,8 +42,22 @@ class DNNClassifierTest(tf.test.TestCase):
 
     classifier.fit(input_fn=_iris_input_fn, steps=1000)
     classifier.evaluate(input_fn=_iris_input_fn, steps=100)
+    self.assertTrue('centered_bias_weight' in classifier.get_variable_names())
     # TODO(ispir): Enable accuracy check after resolving the randomness issue.
     # self.assertGreater(scores['accuracy/mean'], 0.6)
+
+  def testDisableCenteredBias(self):
+    """Tests that we can disable centered bias."""
+    cont_features = [
+        tf.contrib.layers.real_valued_column('feature', dimension=4)]
+
+    classifier = tf.contrib.learn.DNNClassifier(n_classes=3,
+                                                feature_columns=cont_features,
+                                                hidden_units=[3, 3],
+                                                enable_centered_bias=False)
+
+    classifier.fit(input_fn=_iris_input_fn, steps=1000)
+    self.assertFalse('centered_bias_weight' in classifier.get_variable_names())
 
 
 class DNNRegressorTest(tf.test.TestCase):
@@ -67,10 +81,19 @@ def boston_input_fn():
   return features, target
 
 
-class InferedColumnTest(tf.test.TestCase):
+class FeatureColumnTest(tf.test.TestCase):
+
+  # TODO(b/29580537): Remove when we deprecate feature column inference.
+  def testTrainWithInferredFeatureColumns(self):
+    est = tf.contrib.learn.DNNRegressor(hidden_units=[3, 3])
+    est.fit(input_fn=boston_input_fn, steps=1)
+    _ = est.evaluate(input_fn=boston_input_fn, steps=1)
 
   def testTrain(self):
-    est = tf.contrib.learn.DNNRegressor(hidden_units=[3, 3])
+    feature_columns = tf.contrib.learn.infer_real_valued_columns_from_input_fn(
+        boston_input_fn)
+    est = tf.contrib.learn.DNNRegressor(
+        feature_columns=feature_columns, hidden_units=[3, 3])
     est.fit(input_fn=boston_input_fn, steps=1)
     _ = est.evaluate(input_fn=boston_input_fn, steps=1)
 

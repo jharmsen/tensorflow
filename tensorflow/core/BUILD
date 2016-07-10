@@ -105,67 +105,6 @@ tf_proto_library(
     visibility = ["//visibility:public"],
 )
 
-tf_proto_library_cc(
-    name = "worker_proto",
-    srcs = ["protobuf/worker.proto"],
-    cc_api_version = 2,
-    cc_libs = [":protos_all_cc"],
-    visibility = [
-        "//tensorflow:internal",
-    ],
-)
-
-tf_proto_library_cc(
-    name = "worker_service_proto",
-    srcs = ["protobuf/worker_service.proto"],
-    has_services = 1,
-    cc_api_version = 2,
-    cc_libs = [":worker_proto_cc"],
-    cc_stubby_versions = ["2"],
-    visibility = [
-        "//tensorflow:internal",
-    ],
-)
-
-tf_proto_library_cc(
-    name = "master_proto",
-    srcs = ["protobuf/master.proto"],
-    cc_api_version = 2,
-    cc_libs = [":protos_all_cc"],
-    visibility = [
-        "//tensorflow:internal",
-    ],
-)
-
-tf_proto_library_cc(
-    name = "master_service_proto",
-    srcs = ["protobuf/master_service.proto"],
-    has_services = 1,
-    cc_api_version = 2,
-    cc_libs = [":master_proto_cc"],
-    cc_stubby_versions = ["2"],
-    visibility = [
-        "//tensorflow:internal",
-    ],
-)
-
-proto_text_hdrs_and_srcs = tf_generate_proto_text_sources(
-    name = "proto_text_srcs_all",
-    srcs = tf_proto_text_protos_relative(),
-    srcs_relative_dir = "tensorflow/core/",
-)
-
-cc_library(
-    name = "proto_text",
-    srcs = proto_text_hdrs_and_srcs.srcs,
-    hdrs = proto_text_hdrs_and_srcs.hdrs,
-    deps = [
-        ":lib",
-        ":lib_internal",
-        ":protos_all_cc",
-    ],
-)
-
 cc_library(
     name = "lib",
     hdrs = [
@@ -182,6 +121,7 @@ cc_library(
         "lib/gtl/array_slice.h",
         "lib/gtl/inlined_vector.h",
         "lib/gtl/map_util.h",  # TODO(josh11b): make internal
+        "lib/gtl/priority_queue_util.h",
         "lib/gtl/stl_util.h",  # TODO(josh11b): make internal
         "lib/hash/crc32c.h",  # TODO(josh11b): make internal
         "lib/hash/hash.h",  # TODO(josh11b): make internal
@@ -194,6 +134,7 @@ cc_library(
         "lib/io/table_builder.h",
         "lib/io/table_options.h",
         "lib/jpeg/jpeg_mem.h",
+        "lib/monitoring/counter.h",
         "lib/random/distribution_sampler.h",
         "lib/random/philox_random.h",
         "lib/random/simple_philox.h",  # TODO(josh11b): make internal
@@ -256,6 +197,7 @@ tf_cuda_library(
         "framework/attr_value_util.h",
         "framework/bfloat16.h",
         "framework/cancellation.h",
+        "framework/common_shape_fns.h",
         "framework/control_flow.h",  # TODO(josh11b): Make internal?
         "framework/device_base.h",
         "framework/function.h",
@@ -494,6 +436,7 @@ cc_library(
         "//tensorflow/core/kernels:linalg",
         "//tensorflow/core/kernels:logging",
         "//tensorflow/core/kernels:math",
+        "//tensorflow/core/kernels:multinomial_op",
         "//tensorflow/core/kernels:nn",
         "//tensorflow/core/kernels:parsing",
         "//tensorflow/core/kernels:random_ops",
@@ -814,6 +757,50 @@ cc_library(
 # -----------------------------------------------------------------------------
 # Internal targets
 
+tf_proto_library_cc(
+    name = "worker_proto",
+    srcs = ["protobuf/worker.proto"],
+    cc_api_version = 2,
+    cc_libs = [":protos_all_cc"],
+    visibility = [
+        "//tensorflow:internal",
+    ],
+)
+
+tf_proto_library_cc(
+    name = "worker_service_proto",
+    srcs = ["protobuf/worker_service.proto"],
+    has_services = 1,
+    cc_api_version = 2,
+    cc_libs = [":worker_proto_cc"],
+    cc_stubby_versions = ["2"],
+    visibility = [
+        "//tensorflow:internal",
+    ],
+)
+
+tf_proto_library_cc(
+    name = "master_proto",
+    srcs = ["protobuf/master.proto"],
+    cc_api_version = 2,
+    cc_libs = [":protos_all_cc"],
+    visibility = [
+        "//tensorflow:internal",
+    ],
+)
+
+tf_proto_library_cc(
+    name = "master_service_proto",
+    srcs = ["protobuf/master_service.proto"],
+    has_services = 1,
+    cc_api_version = 2,
+    cc_libs = [":master_proto_cc"],
+    cc_stubby_versions = ["2"],
+    visibility = [
+        "//tensorflow:internal",
+    ],
+)
+
 cc_library(
     name = "lib_internal",
     srcs = glob(
@@ -865,6 +852,23 @@ cc_library(
         "//tensorflow/core/platform/default/build_config:platformlib",
         "//third_party/eigen3",
         "@zlib_archive//:zlib",
+    ],
+)
+
+proto_text_hdrs_and_srcs = tf_generate_proto_text_sources(
+    name = "proto_text_srcs_all",
+    srcs = tf_proto_text_protos_relative(),
+    srcs_relative_dir = "tensorflow/core/",
+)
+
+cc_library(
+    name = "proto_text",
+    srcs = proto_text_hdrs_and_srcs.srcs,
+    hdrs = proto_text_hdrs_and_srcs.hdrs,
+    deps = [
+        ":lib",
+        ":lib_internal",
+        ":protos_all_cc",
     ],
 )
 
@@ -1089,12 +1093,32 @@ tf_cuda_library(
     alwayslink = 1,
 )
 
+tf_cuda_library(
+    name = "debug_gateway_internal",
+    srcs = ["debug/debug_gateway.cc"],
+    hdrs = ["debug/debug_gateway.h"],
+    copts = tf_copts(),
+    linkstatic = 1,
+    deps = [
+        ":core_cpu_internal",
+        ":direct_session_internal",
+        ":framework",
+        ":gpu_tracer",
+        ":lib",
+        ":lib_internal",
+        ":proto_text",
+        ":protos_all_cc",
+    ],
+    alwayslink = 1,
+)
+
 cc_library(
     name = "example_parser_configuration",
     srcs = ["example/example_parser_configuration.cc"],
     hdrs = ["example/example_parser_configuration.h"],
     copts = tf_copts(),
     linkstatic = 1,
+    visibility = ["//visibility:public"],
     deps = [
         ":core_cpu_internal",
         ":framework",
@@ -1104,23 +1128,6 @@ cc_library(
         ":protos_all_cc",
     ],
     alwayslink = 1,
-)
-
-tf_cuda_library(
-    name = "cupti_wrapper_default",
-    srcs = [
-        "platform/default/gpu/cupti_wrapper.cc",
-    ],
-    hdrs = [
-        "platform/default/gpu/cupti_wrapper.h",
-    ],
-    copts = tf_copts(),
-    cuda_deps = [
-        ":stream_executor",
-        "//third_party/gpus/cuda:cuda_headers",
-        "//third_party/gpus/cuda:cupti_headers",
-    ],
-    data = ["//third_party/gpus/cuda:cupti_dsos"],
 )
 
 tf_cuda_library(
@@ -1271,6 +1278,7 @@ tf_cc_tests(
         "lib/io/recordio_test.cc",
         "lib/io/table_test.cc",
         "lib/io/zlib_buffers_test.cc",
+        "lib/monitoring/counter_test.cc",
         "lib/random/distribution_sampler_test.cc",
         "lib/random/philox_random_test.cc",
         "lib/random/random_distributions_test.cc",
@@ -1369,6 +1377,7 @@ tf_cc_tests(
         "framework/rendezvous_test.cc",
         "framework/resource_mgr_test.cc",
         "framework/shape_inference_test.cc",
+        "framework/shape_inference_testutil_test.cc",
         "framework/tensor_shape_test.cc",
         "framework/tensor_slice_test.cc",
         "framework/tensor_test.cc",
@@ -1537,6 +1546,67 @@ tf_cc_test(
         "//tensorflow/core/kernels:session_ops",
         "//tensorflow/core/kernels:variable_ops",
         "//third_party/eigen3",
+    ],
+)
+
+tf_cc_test(
+    name = "debug/debug_gateway_test",
+    size = "small",
+    linkstatic = tf_kernel_tests_linkstatic(),
+    deps = [
+        ":core",
+        ":core_cpu",
+        ":core_cpu_internal",
+        ":debug_gateway_internal",
+        ":direct_session_internal",
+        ":framework",
+        ":framework_internal",
+        ":lib",
+        ":lib_internal",
+        ":ops",
+        ":protos_all_cc",
+        ":test",
+        ":test_main",
+        ":testlib",
+        "//tensorflow/cc:cc_ops",
+        "//tensorflow/core/kernels:control_flow_ops",
+        "//tensorflow/core/kernels:cwise_op",
+        "//tensorflow/core/kernels:dense_update_ops",
+        "//tensorflow/core/kernels:fifo_queue_op",
+        "//tensorflow/core/kernels:identity_op",
+        "//tensorflow/core/kernels:matmul_op",
+        "//tensorflow/core/kernels:ops_util",
+        "//tensorflow/core/kernels:queue_ops",
+        "//tensorflow/core/kernels:session_ops",
+        "//tensorflow/core/kernels:variable_ops",
+        "//third_party/eigen3",
+    ],
+)
+
+tf_cc_test_gpu(
+    name = "debug/debug_gateway_gpu_test",
+    size = "small",
+    args = ["--heap_check=local"],
+    linkstatic = tf_kernel_tests_linkstatic(),
+    tags = tf_cuda_tests_tags() + ["nomac"],
+    deps = [
+        ":all_kernels",
+        ":core_cpu",
+        ":core_cpu_internal",
+        ":debug_gateway_internal",
+        ":direct_session",
+        ":direct_session_internal",
+        ":framework",
+        ":framework_internal",
+        ":gpu_runtime",
+        ":lib",
+        ":lib_internal",
+        ":protos_all_cc",
+        ":test",
+        ":test_main",
+        ":testlib",
+        "//tensorflow/cc:cc_ops",
+        "//tensorflow/core/kernels:ops_util",
     ],
 )
 
@@ -1740,6 +1810,31 @@ tf_cc_test(
         "//tensorflow/core/kernels:array",
         "//tensorflow/core/kernels:data_flow",
         "//tensorflow/core/kernels:math",
+        "//third_party/eigen3",
+    ],
+)
+
+tf_cc_tests(
+    size = "small",
+    linkstatic = tf_kernel_tests_linkstatic(),
+    tests = [
+        "ops/array_ops_test.cc",
+        "ops/math_ops_test.cc",
+    ],
+    deps = [
+        ":core",
+        ":core_cpu",
+        ":core_cpu_internal",
+        ":framework",
+        ":framework_internal",
+        ":lib",
+        ":lib_internal",
+        ":ops",
+        ":protos_all_cc",
+        ":test",
+        ":test_main",
+        ":testlib",
+        "//tensorflow/cc:cc_ops",
         "//third_party/eigen3",
     ],
 )

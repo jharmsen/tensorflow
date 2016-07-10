@@ -32,12 +32,12 @@ class NestTest(tf.test.TestCase):
   def testFlattenAndPack(self):
     structure = ((3, 4), 5, (6, 7, (9, 10), 8))
     flat = ["a", "b", "c", "d", "e", "f", "g", "h"]
-    self.assertEqual(nest.flatten(structure), (3, 4, 5, 6, 7, 9, 10, 8))
+    self.assertEqual(nest.flatten(structure), [3, 4, 5, 6, 7, 9, 10, 8])
     self.assertEqual(nest.pack_sequence_as(structure, flat),
                      (("a", "b"), "c", ("d", "e", ("f", "g"), "h")))
     point = collections.namedtuple("Point", ["x", "y"])
     structure = (point(x=4, y=2), ((point(x=1, y=0),),))
-    flat = (4, 2, 1, 0)
+    flat = [4, 2, 1, 0]
     self.assertEqual(nest.flatten(structure), flat)
     restructured_from_flat = nest.pack_sequence_as(structure, flat)
     self.assertEqual(restructured_from_flat, structure)
@@ -85,6 +85,52 @@ class NestTest(tf.test.TestCase):
     with self.assertRaisesRegexp(
         ValueError, "Key had [0-9]* elements, but value had [0-9]* elements"):
       nest.flatten_dict_items(another_bad_dictionary)
+
+  def testAssertSameStructure(self):
+    structure1 = (((1, 2), 3), 4, (5, 6))
+    structure2 = ((("foo1", "foo2"), "foo3"), "foo4", ("foo5", "foo6"))
+    structure_different_num_elements = ("spam", "eggs")
+    structure_different_nesting = (((1, 2), 3), 4, 5, (6,))
+    nest.assert_same_structure(structure1, structure2)
+    nest.assert_same_structure("abc", 1.0)
+    nest.assert_same_structure("abc", np.array([0, 1]))
+    nest.assert_same_structure("abc", tf.constant([0, 1]))
+
+    with self.assertRaisesRegexp(
+        ValueError, "don't have the same number of elements"):
+      nest.assert_same_structure(structure1, structure_different_num_elements)
+
+    with self.assertRaisesRegexp(
+        ValueError, "don't have the same number of elements"):
+      nest.assert_same_structure([0, 1], np.array([0, 1]))
+
+    with self.assertRaisesRegexp(
+        ValueError, "don't have the same number of elements"):
+      nest.assert_same_structure(0, [0, 1])
+
+    self.assertRaises(TypeError, nest.assert_same_structure, (0, 1), [0, 1])
+
+    with self.assertRaisesRegexp(
+        ValueError, "don't have the same nested structure"):
+      nest.assert_same_structure(structure1, structure_different_nesting)
+
+    named_type_0 = collections.namedtuple("named_0", ("a", "b"))
+    named_type_1 = collections.namedtuple("named_1", ("a", "b"))
+    self.assertRaises(TypeError, nest.assert_same_structure,
+                      (0, 1), named_type_0("a", "b"))
+
+    nest.assert_same_structure(named_type_0(3, 4), named_type_0("a", "b"))
+
+    self.assertRaises(TypeError, nest.assert_same_structure,
+                      named_type_0(3, 4), named_type_1(3, 4))
+
+    with self.assertRaisesRegexp(
+        ValueError, "don't have the same nested structure"):
+      nest.assert_same_structure(named_type_0(3, 4), named_type_0([3], 4))
+
+    with self.assertRaisesRegexp(
+        ValueError, "don't have the same nested structure"):
+      nest.assert_same_structure([[3], 4], [3, [4]])
 
 
 if __name__ == "__main__":

@@ -86,8 +86,6 @@ class Env {
   /// shouldn't live longer than the Env object.
   Status NewRandomAccessFile(const string& fname,
                              std::unique_ptr<RandomAccessFile>* result);
-  // NOTE: To be removed, replace with unique_ptr interface above.
-  Status NewRandomAccessFile(const string& fname, RandomAccessFile** result);
 
   /// \brief Creates an object that writes to a new file with the specified
   /// name.
@@ -104,8 +102,6 @@ class Env {
   /// shouldn't live longer than the Env object.
   Status NewWritableFile(const string& fname,
                          std::unique_ptr<WritableFile>* result);
-  // NOTE: To be removed, replace with unique_ptr interface above.
-  Status NewWritableFile(const string& fname, WritableFile** result);
 
   /// \brief Creates an object that either appends to an existing file, or
   /// writes to a new file (if the file does not exist to begin with).
@@ -121,8 +117,6 @@ class Env {
   /// shouldn't live longer than the Env object.
   Status NewAppendableFile(const string& fname,
                            std::unique_ptr<WritableFile>* result);
-  // NOTE: To be removed, replace with unique_ptr interface above.
-  Status NewAppendableFile(const string& fname, WritableFile** result);
 
   /// \brief Creates a readonly region of memory with the file context.
   ///
@@ -137,9 +131,6 @@ class Env {
   /// object shouldn't live longer than the Env object.
   Status NewReadOnlyMemoryRegionFromFile(
       const string& fname, std::unique_ptr<ReadOnlyMemoryRegion>* result);
-  // NOTE: To be removed, replace with unique_ptr interface above.
-  Status NewReadOnlyMemoryRegionFromFile(const string& fname,
-                                         ReadOnlyMemoryRegion** result);
 
   /// Returns true iff the named file exists.
   bool FileExists(const string& fname);
@@ -179,7 +170,7 @@ class Env {
   virtual uint64 NowSeconds() { return NowMicros() / 1000000L; }
 
   /// Sleeps/delays the thread for the prescribed number of micro-seconds.
-  virtual void SleepForMicroseconds(int micros) = 0;
+  virtual void SleepForMicroseconds(int64 micros) = 0;
 
   /// \brief Returns a new thread that is running fn() and is identified
   /// (for debugging/performance-analysis) by "name".
@@ -199,7 +190,8 @@ class Env {
   // of microseconds.
   //
   // NOTE(mrry): This closure must not block.
-  virtual void SchedClosureAfter(int micros, std::function<void()> closure) = 0;
+  virtual void SchedClosureAfter(int64 micros,
+                                 std::function<void()> closure) = 0;
 
   // \brief Load a dynamic library.
   //
@@ -258,7 +250,7 @@ class EnvWrapper : public Env {
   }
 
   uint64 NowMicros() override { return target_->NowMicros(); }
-  void SleepForMicroseconds(int micros) override {
+  void SleepForMicroseconds(int64 micros) override {
     target_->SleepForMicroseconds(micros);
   }
   Thread* StartThread(const ThreadOptions& thread_options, const string& name,
@@ -268,7 +260,7 @@ class EnvWrapper : public Env {
   void SchedClosure(std::function<void()> closure) override {
     target_->SchedClosure(closure);
   }
-  void SchedClosureAfter(int micros, std::function<void()> closure) override {
+  void SchedClosureAfter(int64 micros, std::function<void()> closure) override {
     target_->SchedClosureAfter(micros, closure);
   }
   Status LoadLibrary(const char* library_filename, void** handle) override {
